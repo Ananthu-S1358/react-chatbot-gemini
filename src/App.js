@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-
-// Style components using Tailwind CSS
 import "./App.css";
 import ChatHistory from "./component/ChatHistory";
 import Loading from "./component/Loading";
@@ -10,11 +8,10 @@ const App = () => {
   const [userInput, setUserInput] = useState("");
   const [chatHistory, setChatHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [uploadedImage, setUploadedImage] = useState(null);
 
-  // inislize your Gemeni Api
-  const genAI = new GoogleGenerativeAI(
-    "AIzaSyBT7jIJOd1OfvQGnGyCUUFVKh2QtCudpEg"
-  );
+  // Initialize Gemini API
+  const genAI = new GoogleGenerativeAI(" ");
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
   // Function to handle user input
@@ -22,26 +19,48 @@ const App = () => {
     setUserInput(e.target.value);
   };
 
+  // Function to handle image upload
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    console.log(file);
+
+    if (file) {
+      const reader = new FileReader();
+
+      reader.onloadend = () => {
+        const base64String = reader.result;
+        setUploadedImage(base64String); // Store base64 image data
+        console.log(base64String); // Log the base64 string here
+      };
+
+      reader.readAsDataURL(file);
+    }
+  };
+
   // Function to send user message to Gemini
   const sendMessage = async () => {
-    if (userInput.trim() === "") return;
+    if (!userInput.trim() && !uploadedImage) return;
 
     setIsLoading(true);
     try {
-      // call Gemini Api to get a response
-      const result = await model.generateContent(userInput);
-      const response = await result.response;
-      console.log(response);
-      // add Gemeni's response to the chat history
-      setChatHistory([
-        ...chatHistory,
-        { type: "user", message: userInput },
-        { type: "bot", message: response.text() },
-      ]);
-    } catch {
-      console.error("Error sending message");
+      let botResponse = "";
+      if (userInput) {
+        const result = await model.generateContent(userInput);
+        botResponse = await result.response.text();
+      }
+
+      setChatHistory(
+        [
+          ...chatHistory,
+          { type: "user", message: userInput, image: uploadedImage },
+          botResponse && { type: "bot", message: botResponse },
+        ].filter(Boolean)
+      );
+    } catch (error) {
+      console.error("Error sending message", error);
     } finally {
       setUserInput("");
+      setUploadedImage(null);
       setIsLoading(false);
     }
   };
@@ -51,33 +70,67 @@ const App = () => {
     setChatHistory([]);
   };
 
-  return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold text-center mb-4">Chatbot</h1>
+  // useEffect to show welcome message at the start
+  useEffect(() => {
+    setChatHistory([{ type: "bot", message: "Let me know your queries..." }]);
+  }, []);
 
-      <div className="chat-container rounded-lg shadow-md p-4">
+  return (
+    <div className="min-h-screen bg-[#121212] text-white flex flex-col">
+      <div className="flex-grow flex justify-start items-start">
+        <h2 className="text-3xl text-gray-400 mt-4 ml-4">Medical ChatBot</h2>
+      </div>
+
+      <div className="flex-grow flex justify-center items-center">
+        <div className="welcome-section text-center">
+          <h1 className="text-6xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400">
+            Hello, How can I help you today?
+          </h1>
+        </div>
+      </div>
+
+      <div
+        className="chat-container bg-[#1E1E1E] rounded-lg shadow-md p-4 flex-grow overflow-auto mx-auto max-w-4xl mt-8"
+        style={{ height: "40vh", width: "100%" }}
+      >
         <ChatHistory chatHistory={chatHistory} />
         <Loading isLoading={isLoading} />
       </div>
 
-      <div className="flex mt-4">
+      <div className="flex items-center justify-center mt-4 px-4">
+        <input
+          type="file"
+          accept="image/*"
+          className="file-input hidden"
+          id="image-upload"
+          onChange={handleImageUpload}
+        />
+        <label
+          htmlFor="image-upload"
+          className="file-input-label cursor-pointer px-4 py-2 bg-[#3A3A3A] text-white rounded-lg mr-2 hover:bg-[#4A4A4A] focus:outline-none"
+        >
+          Upload Image
+        </label>
+
         <input
           type="text"
-          className="flex-grow px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-grow px-4 py-2 rounded-lg bg-[#333333] border border-gray-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder="Type your message..."
           value={userInput}
           onChange={handleUserInput}
         />
+
         <button
-          className="px-4 py-2 ml-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 focus:outline-none"
+          className="px-4 py-2 ml-2 rounded-lg bg-[#3A3A3A] text-white hover:bg-[#4A4A4A] focus:outline-none"
           onClick={sendMessage}
           disabled={isLoading}
         >
           Send
         </button>
       </div>
+
       <button
-        className="mt-4 block px-4 py-2 rounded-lg bg-gray-400 text-white hover:bg-gray-500 focus:outline-none"
+        className="clear-chat-btn mt-4 px-4 py-2 mx-auto rounded-lg bg-[#3A3A3A] text-white hover:bg-[#4A4A4A] focus:outline-none"
         onClick={clearChat}
       >
         Clear Chat
